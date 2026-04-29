@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摸鱼大师 - 钓鱼挂机游戏 v0.11</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="top-bar">
+            <div class="gold-display">
+                <span class="icon">💰</span>
+                <span id="gold">100</span>
+            </div>
+            <div class="level-display">
+                <span class="icon">Lv</span>
+                <span id="level">1</span>
+            </div>
+            <div class="equipment">
+                <span class="label">鱼竿:</span>
+                <span id="rod-name">竹竿</span>
+                <span class="label">鱼饵:</span>
+                <span id="bait-name">基础鱼饵</span>
+                <span id="bait-count">×10</span>
+            </div>
+            <div class="location">
+                <span class="icon">🌊</span>
+                <select id="location-select">
+                    <option value="silent-bay">静默废湾</option>
+                    <option value="hot-vent">热核裂谷</option>
+                    <option value="void-reef">虚空暗礁</option>
+                </select>
+            </div>
+        </header>
+
+        <main class="main-area">
+            <div class="fishing-control">
+                <button id="fishing-toggle" class="btn btn-primary">开始钓鱼</button>
+                <button id="debug-btn" class="btn btn-debug" style="display: none;">调试上钩</button>
+                <div class="status">
+                    <span id="fishing-status">未钓鱼</span>
+                </div>
+            </div>
+
+            <div class="minigame-overlay" id="minigame-overlay" style="display: none;">
+                <div class="minigame-container">
+                    <div class="minigame-header">
+                        <h2>🎣 上钩了！</h2>
+                        <div class="minigame-timer">剩余时间: <span id="minigame-time">30</span>秒</div>
+                    </div>
+                    <div class="minigame-sequence" id="minigame-sequence"></div>
+                    <div class="minigame-hint">按顺序按下: <span id="minigame-hint"></span></div>
+                    <div class="minigame-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                    </div>
+                    <div class="minigame-result" id="minigame-result"></div>
+                </div>
+            </div>
+
+            <div class="event-log">
+                <h3>钓鱼日志</h3>
+                <div id="log-content"></div>
+            </div>
+        </main>
+
+        <nav class="bottom-nav">
+            <button id="btn-basket" class="nav-btn active">🐟 鱼篓</button>
+            <button id="btn-shop" class="nav-btn">🏪 商店</button>
+            <button id="btn-craft" class="nav-btn">⚗️ 合成</button>
+            <button id="btn-collection" class="nav-btn">📖 图鉴</button>
+            <button id="btn-save" class="nav-btn">💾 存档</button>
+        </nav>
+
+        <div class="modal-overlay" id="modal-overlay"></div>
+
+        <div class="modal" id="basket-modal">
+            <div class="modal-header">
+                <h2>🐟 鱼篓</h2>
+                <span class="capacity">容量: <span id="basket-used">0</span>/<span id="basket-max">30</span></span>
+                <button class="close-btn" onclick="closeModal('basket-modal')">×</button>
+            </div>
+            <div class="modal-body" id="basket-content"></div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="sellAllFish()">全部出售</button>
+                <button class="btn btn-secondary" onclick="closeModal('basket-modal')">关闭</button>
+            </div>
+        </div>
+
+        <div class="modal" id="shop-modal">
+            <div class="modal-header">
+                <h2>🏪 商店</h2>
+                <button class="close-btn" onclick="closeModal('shop-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="shop-section">
+                    <h3>鱼竿</h3>
+                    <div id="shop-rods"></div>
+                </div>
+                <div class="shop-section">
+                    <h3>鱼饵</h3>
+                    <div id="shop-baits"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="craft-modal">
+            <div class="modal-header">
+                <h2>⚗️ 合成</h2>
+                <button class="close-btn" onclick="closeModal('craft-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="materials-info">
+                    <h3>材料库存</h3>
+                    <div id="materials-list"></div>
+                </div>
+                <div class="craft-recipes">
+                    <h3>合成配方</h3>
+                    <div id="recipes-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal" id="collection-modal">
+            <div class="modal-header">
+                <h2>📖 图鉴</h2>
+                <button class="close-btn" onclick="closeModal('collection-modal')">×</button>
+            </div>
+            <div class="modal-body" id="collection-content"></div>
+        </div>
+
+        <div class="modal" id="save-modal">
+            <div class="modal-header">
+                <h2>💾 存档管理</h2>
+                <button class="close-btn" onclick="closeModal('save-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="save-actions">
+                    <button class="btn btn-danger btn-full" onclick="game.deleteSave()">🗑️ 删除存档</button>
+                    <button class="btn btn-primary btn-full" onclick="game.exportSave()">📤 导出存档</button>
+                    <button class="btn btn-secondary btn-full" onclick="game.showImportPrompt()">📥 导入存档</button>
+                </div>
+                <textarea id="save-data" placeholder="在此粘贴存档数据..." rows="8"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

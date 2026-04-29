@@ -1,0 +1,79 @@
+{
+    "fishTypes": {
+        "pulse": { "name": "脉冲鱼", "icon": "⚡", "prices": { "small": 30, "medium": 50, "large": 120, "giant": 100 } },
+        "fission": { "name": "裂变鱼", "icon": "🔥", "prices": { "small": 20, "medium": 40, "large": 100, "giant": 80 } },
+        "radiation": { "name": "辐射鱼", "icon": "☢️", "prices": { "small": 40, "medium": 60, "large": 150, "giant": 120 } },
+        "nano": { "name": "纳米鱼", "icon": "🔬", "prices": { "small": 50, "medium": 80, "large": 180, "giant": 150 } },
+        "void": { "name": "虚空鳕", "icon": "🌀", "prices": { "small": 60, "medium": 100, "large": 250, "giant": 200 } },
+        "neon": { "name": "霓虹珍珠鳞", "icon": "💎", "prices": { "small": 300 }, "isRare": true }
+    },
+    "fishSizes": {
+        "small": { "name": "小型", "order": 0 },
+        "medium": { "name": "中型", "order": 1 },
+        "giant": { "name": "巨型", "order": 2 },
+        "large": { "name": "大型", "order": 3 }
+    },
+    "locations": {
+        "silent-bay": {
+            "name": "静默废湾",
+            "description": "废弃工业区，水下电子废料",
+            "fishProbabilities": { "pulse": 0.5, "radiation": 0.3, "nano": 0.15, "neon": 0.05 },
+            "material": "battery",
+            "materialName": "废电池",
+            "materialIcon": "🔋"
+        },
+        "hot-vent": {
+            "name": "热核裂谷",
+            "description": "海底地热喷口，能量紊乱",
+            "fishProbabilities": { "fission": 0.45, "radiation": 0.25, "pulse": 0.2, "neon": 0.1 },
+            "material": "heat-coil",
+            "materialName": "耐热线圈",
+            "materialIcon": "🔌"
+        },
+        "void-reef": {
+            "name": "虚空暗礁",
+            "description": "空间不稳定区域，连接未知维度",
+            "fishProbabilities": { "void": 0.4, "nano": 0.25, "radiation": 0.2, "pulse": 0.1, "neon": 0.05 },
+            "material": "void-dust",
+            "materialName": "虚空粉尘",
+            "materialIcon": "✨"
+        }
+    },
+    "rods": {
+        "bamboo": { "name": "竹竿", "price": 0, "effect": "basic", "description": "初始赠送，仅可钓小、中型鱼" },
+        "resonance": { "name": "共振钓竿", "price": 1000, "effect": "full-size", "description": "全尺寸，无额外加成" },
+        "singularity": { "name": "奇点竿", "price": 5000, "effect": "shiny", "value": 0.02, "description": "全尺寸，闪耀概率+2%" }
+    },
+    "baits": {
+        "basic": { "name": "基础鱼饵", "price": 4, "effect": "none", "description": "无特效" },
+        "fission": { "name": "裂变饵", "effect": "target-fish", "target": "fission", "value": 0.4, "description": "裂变鱼概率+40%" },
+        "void": { "name": "虚空饵", "effect": "target-fish", "target": "void", "value": 0.4, "description": "虚空鳕概率+40%" },
+        "pulse": { "name": "脉冲饵", "effect": "target-fish", "target": "pulse", "value": 0.4, "description": "脉冲鱼概率+40%" },
+        "lucky": { "name": "幸运饵", "effect": "shiny", "value": 0.02, "description": "闪耀概率+2%" }
+    },
+    "recipes": {
+        "basic": { "baitId": "basic", "materials": { "any": 1 }, "craftCount": 2 },
+        "fission": { "baitId": "fission", "materials": { "battery": 2 }, "craftCount": 3 },
+        "void": { "baitId": "void", "materials": { "heat-coil": 2 }, "craftCount": 3 },
+        "pulse": { "baitId": "pulse", "materials": { "void-dust": 2 }, "craftCount": 3 },
+        "lucky": { "baitId": "lucky", "materials": { "battery": 1, "void-dust": 1 }, "craftCount": 2 }
+    },
+    "levelSizeProbabilities": {
+        "levels": [1, 4, 7, 10],
+        "probabilities": [
+            { "small": 0.6, "medium": 0.3, "large": 0.1, "giant": 0 },
+            { "small": 0.42, "medium": 0.28, "large": 0.25, "giant": 0.05 },
+            { "small": 0.2, "medium": 0.25, "large": 0.45, "giant": 0.1 },
+            { "small": 0.05, "medium": 0.25, "large": 0.6, "giant": 0.1 }
+        ]
+    },
+    "experienceTable": [0, 100, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000],
+    "events": [
+        { "id": "dragon-rage", "name": "龙王的愤怒", "probability": 0.02, "description": "脱钩，损失鱼饵，下次上鱼必为小型" },
+        { "id": "rapid-current", "name": "急流", "probability": 0.02, "description": "当前水域上钩时间-30%，持续120分钟" },
+        { "id": "data-overflow", "name": "数据溢出", "probability": 0.015, "description": "本次渔获复制两份，一条非闪耀" },
+        { "id": "void-rift", "name": "虚空裂缝", "probability": 0.01, "description": "鱼种强制变虚空鳕，不低于中型" }
+    ],
+    "shinyBaseProb": 0.02,
+    "basketCapacity": 30
+}
