@@ -44,12 +44,30 @@ class Game {
             this.initMaterials();
             this.initCollection();
             this.loadGame();
+            this.requestNotificationPermission();
             this.updateUI();
             this.setupEventListeners();
             this.checkDebugMode();
         } catch (error) {
             console.error('Failed to initialize game:', error);
             document.getElementById('fishing-status').textContent = '加载失败，请刷新页面';
+        }
+    }
+    
+    requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            console.log('浏览器不支持桌面通知');
+            return;
+        }
+        
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    this.addLog('📢 通知权限已开启', 'fish');
+                }
+            }).catch(error => {
+                console.error('请求通知权限失败:', error);
+            });
         }
     }
 
@@ -248,7 +266,11 @@ class Game {
             return;
         }
         
-        if (this.baitCount <= 0) {
+        if (this.baitCount > 0) {
+            this.baitCount--;
+            this.addLog('🎣 开始钓鱼，消耗了1个鱼饵', 'fish');
+            this.checkBaitEmpty();
+        } else {
             this.addLog('⚠️ 没有鱼饵，上鱼时间将翻倍！', 'error');
         }
         
@@ -346,12 +368,7 @@ class Game {
         if (!this.isFishing) return;
         
         if (this.checkEvent('dragon-rage')) {
-            const hasBait = this.baitCount > 0;
-            if (hasBait) {
-                this.baitCount--;
-                this.checkBaitEmpty();
-            }
-            this.addLog('⚠️ 龙王的愤怒！脱钩了，损失鱼饵，下次必为小型鱼', 'error');
+            this.addLog('⚠️ 龙王的愤怒！脱钩了，下次必为小型鱼', 'error');
             this.nextFishForceSmall = true;
             this.updateUI();
             if (this.isFishing && this.basket.length < this.gameData.basketCapacity) {
@@ -366,11 +383,6 @@ class Game {
             this.startMinigame();
             this.sendDesktopNotification('🎣 上钩了！', '快按顺序输入WASD按键来钓鱼！');
         } else {
-            const hasBait = this.baitCount > 0;
-            if (hasBait) {
-                this.baitCount--;
-                this.checkBaitEmpty();
-            }
             this.getMaterial();
             this.updateUI();
             
@@ -483,8 +495,13 @@ class Game {
                 resultDiv.textContent = '⚡ 快速成功！闪耀概率+2%，不消耗鱼饵！';
                 resultDiv.className = 'minigame-result fast';
             } else {
-                resultDiv.textContent = '✅ 成功！不消耗鱼饵！';
+                resultDiv.textContent = '✅ 成功！消耗1个鱼饵';
                 resultDiv.className = 'minigame-result success';
+                
+                if (this.baitCount > 0) {
+                    this.baitCount--;
+                    this.checkBaitEmpty();
+                }
             }
             
             this.catchFishWithBonus();
@@ -503,14 +520,9 @@ class Game {
                 this.saveGame();
             }, 1500);
         } else {
-            resultDiv.textContent = '❌ 失败！消耗鱼饵';
+            resultDiv.textContent = '❌ 失败！鱼跑了';
             resultDiv.className = 'minigame-result fail';
             this.addLog('很遗憾，鱼跑了 T_T', 'error');
-            
-            const hasBait = this.baitCount > 0;
-            if (hasBait) {
-                this.baitCount--;
-            }
             
             setTimeout(() => {
                 overlay.style.display = 'none';
@@ -644,22 +656,33 @@ class Game {
 
     sendDesktopNotification(title, body) {
         if (!('Notification' in window)) {
+            console.log('浏览器不支持桌面通知');
             return;
         }
         
         if (Notification.permission === 'granted') {
-            new Notification(title, {
-                body: body,
-                icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🎣</text></svg>'
-            });
+            try {
+                new Notification(title, {
+                    body: body,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/102/102668.png'
+                });
+            } catch (error) {
+                console.error('发送通知失败:', error);
+            }
         } else if (Notification.permission !== 'denied') {
             Notification.requestPermission().then(permission => {
                 if (permission === 'granted') {
-                    new Notification(title, {
-                        body: body,
-                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🎣</text></svg>'
-                    });
+                    try {
+                        new Notification(title, {
+                            body: body,
+                            icon: 'https://cdn-icons-png.flaticon.com/512/102/102668.png'
+                        });
+                    } catch (error) {
+                        console.error('发送通知失败:', error);
+                    }
                 }
+            }).catch(error => {
+                console.error('请求通知权限失败:', error);
             });
         }
     }
