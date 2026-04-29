@@ -135,6 +135,34 @@ body {
     border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
+.btn-feeding {
+    background: #ddd;
+    color: #888;
+    margin-left: 10px;
+    position: relative;
+    overflow: hidden;
+    transition: color 0.3s;
+}
+
+.btn-feeding .feeding-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ff9800, #f57c00);
+    transition: width 0.5s ease-out;
+}
+
+.btn-feeding.has-heat {
+    color: white;
+}
+
+.btn-feeding:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .btn-debug {
     background: linear-gradient(135deg, #9c27b0, #7b1fa2);
     color: white;

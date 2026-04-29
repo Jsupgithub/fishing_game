@@ -24,6 +24,15 @@ class Game {
         this.minigameIndex = 0;
         this.minigameStartTime = 0;
         this.minigameSuccessBonus = 0;
+        this.feedingHeat = 0;
+        this.feedingCooldown = false;
+        this.totalFeedingReduction = 0;
+        this.feedingDecayTimer = null;
+        this.statusUpdateTimer = null;
+        this.hookCountdownTimer = null;
+        this.totalHookTime = 0;
+        this.totalElapsedTime = 0;
+        this.lastHookCheck = 0;
         
         this.init();
     }
@@ -125,6 +134,8 @@ class Game {
                 this.materials = { ...this.materials, ...this.validateMaterials(data.materials || {}) };
                 this.collection = { ...this.collection, ...this.validateCollection(data.collection || {}) };
                 this.eventEffects = data.eventEffects || this.eventEffects;
+                this.feedingHeat = data.feedingHeat || 0;
+                this.feedingCooldown = false;
             } catch (error) {
                 console.warn('Failed to load saved game data, using defaults:', error);
             }
@@ -182,13 +193,15 @@ class Game {
             basket: this.basket,
             materials: this.materials,
             collection: this.collection,
-            eventEffects: this.eventEffects
+            eventEffects: this.eventEffects,
+            feedingHeat: this.feedingHeat > 0 && !this.feedingCooldown ? this.feedingHeat : 0
         };
         localStorage.setItem('fishing-game-data', JSON.stringify(data));
     }
 
     setupEventListeners() {
         document.getElementById('fishing-toggle').addEventListener('click', () => this.toggleFishing());
+        document.getElementById('feeding-btn').addEventListener('click', () => this.doFeeding());
         document.getElementById('debug-btn').addEventListener('click', () => this.debugHook());
         document.getElementById('location-select').addEventListener('change', (e) => {
             const oldLocation = this.currentLocation;
@@ -240,11 +253,66 @@ class Game {
         }
         
         this.isFishing = true;
+        this.totalFeedingReduction = 0;
+        this.feedingHeat = 0;
+        this.totalElapsedTime = 0;
+        
+        const isFish = Math.random() < 0.7;
+        const baseMinutes = isFish ? (5 + Math.sqrt(Math.random()) * 40) : 5;
+        const baseMs = baseMinutes * 60 * 1000;
+        
+        let adjustedTime = baseMs;
+        if (this.baitCount <= 0) {
+            adjustedTime *= 2;
+        }
+        
+        this.totalHookTime = adjustedTime;
+        this.lastHookCheck = Date.now();
+        this.updateRemainingTime();
+        
+        if (this.hookCountdownTimer) {
+            clearInterval(this.hookCountdownTimer);
+        }
+        this.hookCountdownTimer = setInterval(() => {
+            if (this.isFishing) {
+                this.updateRemainingTime();
+            }
+        }, 1000);
+        
         document.getElementById('fishing-toggle').textContent = '停止钓鱼';
         document.getElementById('fishing-toggle').classList.add('active');
-        document.getElementById('fishing-status').textContent = '正在钓鱼...';
+        this.updateUI();
+    }
+    
+    updateRemainingTime() {
+        if (!this.isFishing) return;
         
-        this.scheduleNextHook();
+        const now = Date.now();
+        const elapsedSinceLastCheck = now - this.lastHookCheck;
+        this.lastHookCheck = now;
+        
+        this.totalElapsedTime = (this.totalElapsedTime || 0) + elapsedSinceLastCheck;
+        
+        const effectiveTotalTime = this.totalHookTime - (this.totalFeedingReduction * 60 * 1000);
+        this.remainingHookTime = Math.max(0, effectiveTotalTime - this.totalElapsedTime);
+        
+        const minutes = Math.ceil(this.remainingHookTime / 60000);
+        document.getElementById('fishing-status').textContent = `正在钓鱼... (预计${minutes}分钟)`;
+        
+        if (this.feedingHeat > 0 && !this.feedingCooldown) {
+            this.feedingHeat = Math.max(0, this.feedingHeat - 1);
+            if (this.feedingHeat === 0) {
+                clearInterval(this.feedingDecayTimer);
+                this.feedingDecayTimer = null;
+            }
+            this.updateUI();
+        }
+        
+        if (this.remainingHookTime <= 0) {
+            clearInterval(this.hookCountdownTimer);
+            this.hookCountdownTimer = null;
+            this.executeHook();
+        }
     }
 
     stopFishing() {
@@ -257,48 +325,21 @@ class Game {
             clearTimeout(this.hookTimer);
             this.hookTimer = null;
         }
-    }
-
-    scheduleNextHook() {
-        if (!this.isFishing) {
-            return;
+        
+        if (this.hookCountdownTimer) {
+            clearInterval(this.hookCountdownTimer);
+            this.hookCountdownTimer = null;
         }
         
-        if (this.hookTimer) {
-            clearTimeout(this.hookTimer);
-            this.hookTimer = null;
+        if (this.feedingDecayTimer) {
+            clearInterval(this.feedingDecayTimer);
+            this.feedingDecayTimer = null;
         }
         
-        const baseTime = this.getRandomHookTime();
-        let adjustedTime = baseTime;
-        
-        if (this.eventEffects['rapid-current']) {
-            adjustedTime *= 0.7;
+        if (this.statusUpdateTimer) {
+            clearInterval(this.statusUpdateTimer);
+            this.statusUpdateTimer = null;
         }
-        
-        const rod = this.gameData.rods[this.currentRod];
-        if (rod.effect === 'speed' && rod.value) {
-            adjustedTime *= (1 - rod.value);
-        }
-        
-        if (this.baitCount <= 0) {
-            adjustedTime *= 2;
-        }
-        
-        this.nextHookTime = Date.now() + adjustedTime;
-        
-        this.hookTimer = setTimeout(() => {
-            this.executeHook();
-        }, adjustedTime);
-    }
-
-    getRandomHookTime() {
-        const minMinutes = 5;
-        const maxMinutes = 60;
-        const range = maxMinutes - minMinutes;
-        const u = Math.random();
-        const time = maxMinutes - Math.sqrt(u) * range;
-        return time * 60 * 1000;
     }
 
     executeHook() {
@@ -314,7 +355,7 @@ class Game {
             this.nextFishForceSmall = true;
             this.updateUI();
             if (this.isFishing && this.basket.length < this.gameData.basketCapacity) {
-                this.scheduleNextHook();
+                this.startFishing();
             }
             this.saveGame();
             return;
@@ -334,7 +375,7 @@ class Game {
             this.updateUI();
             
             if (this.isFishing && this.basket.length < this.gameData.basketCapacity) {
-                this.scheduleNextHook();
+                this.startFishing();
             } else if (this.basket.length >= this.gameData.basketCapacity) {
                 this.addLog('鱼篓已满，自动停止钓鱼', 'error');
                 this.stopFishing();
@@ -453,7 +494,7 @@ class Game {
                 this.updateUI();
                 
                 if (this.isFishing && this.basket.length < this.gameData.basketCapacity) {
-                    this.scheduleNextHook();
+                    this.startFishing();
                 } else if (this.basket.length >= this.gameData.basketCapacity) {
                     this.addLog('鱼篓已满，自动停止钓鱼', 'error');
                     this.stopFishing();
@@ -464,6 +505,7 @@ class Game {
         } else {
             resultDiv.textContent = '❌ 失败！消耗鱼饵';
             resultDiv.className = 'minigame-result fail';
+            this.addLog('很遗憾，鱼跑了 T_T', 'error');
             
             const hasBait = this.baitCount > 0;
             if (hasBait) {
@@ -475,7 +517,7 @@ class Game {
                 this.updateUI();
                 
                 if (this.isFishing && this.basket.length < this.gameData.basketCapacity) {
-                    this.scheduleNextHook();
+                    this.startFishing();
                 }
                 
                 this.saveGame();
@@ -566,6 +608,34 @@ class Game {
         }
     }
 
+    doFeeding() {
+        if (this.feedingCooldown) {
+            this.addLog('⏰ 打窝正在冷却中...', 'error');
+            return;
+        }
+        
+        this.feedingHeat += 20;
+        
+        if (this.feedingHeat >= 100) {
+            this.feedingHeat = 100;
+            this.feedingCooldown = true;
+            this.addLog('🔥 饵料空了！正在补充…', 'error');
+            
+            setTimeout(() => {
+                this.feedingHeat = 0;
+                this.feedingCooldown = false;
+                this.updateUI();
+                this.addLog('✅ 打窝冷却完成，可以继续使用', 'fish');
+            }, 10000);
+        } else {
+            this.totalFeedingReduction += 1;
+            this.addLog(`🐟 打窝成功！饵料剩余${100 - this.feedingHeat}%，已缩短上鱼时间1分钟`, 'fish');
+        }
+        
+        this.updateUI();
+    }
+
+    
     checkBaitEmpty() {
         if (this.baitCount <= 0) {
             this.addLog('⚠️ 鱼饵用完了！上鱼时间将翻倍！', 'error');
@@ -820,6 +890,18 @@ class Game {
         
         document.getElementById('basket-used').textContent = this.basket.length;
         document.getElementById('basket-max').textContent = this.gameData.basketCapacity;
+        
+        const feedingBtn = document.getElementById('feeding-btn');
+        const feedingFill = feedingBtn.querySelector('.feeding-fill');
+        
+        if (this.feedingHeat > 0) {
+            feedingFill.style.width = `${this.feedingHeat}%`;
+            feedingBtn.classList.add('has-heat');
+        } else {
+            feedingFill.style.width = '0%';
+            feedingBtn.classList.remove('has-heat');
+        }
+        feedingBtn.disabled = this.feedingCooldown;
         
         this.updateBasketDisplay();
         this.updateShopDisplay();
