@@ -13,8 +13,6 @@ class Game {
         this.materials = {};
         this.collection = {};
         this.isFishing = false;
-        this.nextHookTime = 0;
-        this.hookTimer = null;
         this.debugMode = false;
         this.logs = [];
         this.eventEffects = {};
@@ -28,7 +26,6 @@ class Game {
         this.feedingCooldown = false;
         this.totalFeedingReduction = 0;
         this.feedingDecayTimer = null;
-        this.statusUpdateTimer = null;
         this.hookCountdownTimer = null;
         this.totalHookTime = 0;
         this.totalElapsedTime = 0;
@@ -39,7 +36,7 @@ class Game {
 
     async init() {
         try {
-            await this.loadGameData();
+            this.gameData = window.GAME_DATA;
             this.migrateOldData();
             this.initMaterials();
             this.initCollection();
@@ -55,47 +52,26 @@ class Game {
     }
     
     requestNotificationPermission() {
-        if (!('Notification' in window)) {
-            console.log('浏览器不支持桌面通知');
-            return;
-        }
-        
+        if (!('Notification' in window)) return;
         if (Notification.permission === 'default') {
-            Notification.requestPermission().then(permission => {
-                if (permission === 'granted') {
-                    this.addLog('📢 通知权限已开启', 'fish');
-                }
-            }).catch(error => {
-                console.error('请求通知权限失败:', error);
-            });
+            Notification.requestPermission();
         }
     }
 
     migrateOldData() {
         const saved = localStorage.getItem('fishing-game-data');
         if (!saved) return;
-        
         try {
             const data = JSON.parse(saved);
             const hasOldFishTypes = data.basket && data.basket.some(fish => 
                 ['electric', 'fire'].includes(fish.type)
             );
-            
             if (hasOldFishTypes) {
                 localStorage.removeItem('fishing-game-data');
-                console.log('Removed old game data with incompatible fish types');
             }
         } catch (error) {
             console.warn('Error checking for old data:', error);
         }
-    }
-
-    async loadGameData() {
-        const response = await fetch('gameData.json');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        this.gameData = await response.json();
     }
 
     initMaterials() {
@@ -106,16 +82,13 @@ class Game {
     }
 
     initCollection() {
-        if (!this.gameData || !this.gameData.fishTypes) {
-            console.error('gameData not loaded properly');
-            return;
-        }
+        if (!this.gameData || !this.gameData.fishTypes) return;
         
         Object.keys(this.gameData.fishTypes).forEach(type => {
             const fish = this.gameData.fishTypes[type];
             if (!fish) return;
             
-            const sizes = fish.isRare ? ['small'] : (this.gameData.fishSizes ? Object.keys(this.gameData.fishSizes) : ['small', 'medium', 'large', 'giant']);
+            const sizes = fish.isRare ? ['small'] : Object.keys(this.gameData.fishSizes);
             sizes.forEach(size => {
                 this.collection[`${type}-${size}`] = { normal: false, shiny: false };
             });
@@ -127,11 +100,9 @@ class Game {
         if (saved) {
             try {
                 const data = JSON.parse(saved);
-                
                 const validRods = Object.keys(this.gameData.rods);
                 const validBaits = Object.keys(this.gameData.baits);
                 const validLocations = Object.keys(this.gameData.locations);
-                const validFishTypes = Object.keys(this.gameData.fishTypes);
                 
                 this.gold = data.gold || this.gold;
                 this.fishingLevel = data.fishingLevel || this.fishingLevel;
@@ -151,11 +122,9 @@ class Game {
                 this.basket = this.validateBasket(data.basket || []);
                 this.materials = { ...this.materials, ...this.validateMaterials(data.materials || {}) };
                 this.collection = { ...this.collection, ...this.validateCollection(data.collection || {}) };
-                this.eventEffects = data.eventEffects || this.eventEffects;
-                this.feedingHeat = data.feedingHeat || 0;
-                this.feedingCooldown = false;
+                this.eventEffects = data.eventEffects || {};
             } catch (error) {
-                console.warn('Failed to load saved game data, using defaults:', error);
+                console.warn('Failed to load saved game data:', error);
             }
         }
     }
@@ -176,9 +145,7 @@ class Game {
         const validMaterials = ['battery', 'heat-coil', 'void-dust'];
         const result = {};
         Object.entries(materials).forEach(([key, value]) => {
-            if (validMaterials.includes(key)) {
-                result[key] = value;
-            }
+            if (validMaterials.includes(key)) result[key] = value;
         });
         return result;
     }
@@ -190,9 +157,7 @@ class Game {
             if (this.gameData.fishTypes[type]) {
                 const fishType = this.gameData.fishTypes[type];
                 const validSizes = fishType.isRare ? ['small'] : Object.keys(this.gameData.fishSizes);
-                if (validSizes.includes(size)) {
-                    result[key] = value;
-                }
+                if (validSizes.includes(size)) result[key] = value;
             }
         });
         return result;
@@ -222,16 +187,10 @@ class Game {
         document.getElementById('feeding-btn').addEventListener('click', () => this.doFeeding());
         document.getElementById('debug-btn').addEventListener('click', () => this.debugHook());
         document.getElementById('location-select').addEventListener('change', (e) => {
-            const oldLocation = this.currentLocation;
+            if (this.isFishing) this.stopFishing();
             this.currentLocation = e.target.value;
-            
-            if (this.isFishing) {
-                this.stopFishing();
-            }
-            
             const locationName = this.gameData.locations[this.currentLocation].name;
             this.addLog(`🌊 已来到【${locationName}】`, 'fish');
-            
             this.updateUI();
         });
 
@@ -292,13 +251,9 @@ class Game {
         this.lastHookCheck = Date.now();
         this.updateRemainingTime();
         
-        if (this.hookCountdownTimer) {
-            clearInterval(this.hookCountdownTimer);
-        }
+        if (this.hookCountdownTimer) clearInterval(this.hookCountdownTimer);
         this.hookCountdownTimer = setInterval(() => {
-            if (this.isFishing) {
-                this.updateRemainingTime();
-            }
+            if (this.isFishing) this.updateRemainingTime();
         }, 1000);
         
         document.getElementById('fishing-toggle').textContent = '停止钓鱼';
@@ -312,7 +267,6 @@ class Game {
         const now = Date.now();
         const elapsedSinceLastCheck = now - this.lastHookCheck;
         this.lastHookCheck = now;
-        
         this.totalElapsedTime = (this.totalElapsedTime || 0) + elapsedSinceLastCheck;
         
         const effectiveTotalTime = this.totalHookTime - (this.totalFeedingReduction * 60 * 1000);
@@ -356,11 +310,6 @@ class Game {
         if (this.feedingDecayTimer) {
             clearInterval(this.feedingDecayTimer);
             this.feedingDecayTimer = null;
-        }
-        
-        if (this.statusUpdateTimer) {
-            clearInterval(this.statusUpdateTimer);
-            this.statusUpdateTimer = null;
         }
     }
 
@@ -436,8 +385,8 @@ class Game {
         const hintSpan = document.getElementById('minigame-hint');
         
         overlay.style.display = 'flex';
-        
         sequenceDiv.innerHTML = '';
+        
         this.minigameSequence.forEach((key, index) => {
             const keyDiv = document.createElement('div');
             keyDiv.className = 'minigame-key';
@@ -475,9 +424,7 @@ class Game {
             }
         } else {
             document.getElementById(`minigame-key-${this.minigameIndex}`).classList.add('wrong');
-            setTimeout(() => {
-                this.endMinigame(false);
-            }, 500);
+            setTimeout(() => this.endMinigame(false), 500);
         }
     }
 
@@ -495,13 +442,8 @@ class Game {
                 resultDiv.textContent = '⚡ 快速成功！闪耀概率+2%，不消耗鱼饵！';
                 resultDiv.className = 'minigame-result fast';
             } else {
-                resultDiv.textContent = '✅ 成功！消耗1个鱼饵';
+                resultDiv.textContent = '✅ 成功！';
                 resultDiv.className = 'minigame-result success';
-                
-                if (this.baitCount > 0) {
-                    this.baitCount--;
-                    this.checkBaitEmpty();
-                }
             }
             
             this.catchFishWithBonus();
@@ -647,7 +589,6 @@ class Game {
         this.updateUI();
     }
 
-    
     checkBaitEmpty() {
         if (this.baitCount <= 0) {
             this.addLog('⚠️ 鱼饵用完了！上鱼时间将翻倍！', 'error');
@@ -655,10 +596,7 @@ class Game {
     }
 
     sendDesktopNotification(title, body) {
-        if (!('Notification' in window)) {
-            console.log('浏览器不支持桌面通知');
-            return;
-        }
+        if (!('Notification' in window)) return;
         
         if (Notification.permission === 'granted') {
             try {
@@ -681,8 +619,6 @@ class Game {
                         console.error('发送通知失败:', error);
                     }
                 }
-            }).catch(error => {
-                console.error('请求通知权限失败:', error);
             });
         }
     }
@@ -699,91 +635,8 @@ class Game {
             document.getElementById('fishing-toggle').classList.add('active');
             document.getElementById('fishing-status').textContent = '正在钓鱼...';
         }
-        if (this.hookTimer) {
-            clearTimeout(this.hookTimer);
-        }
+        if (this.hookTimer) clearTimeout(this.hookTimer);
         this.executeHook();
-    }
-
-    catchFish() {
-        const location = this.gameData.locations[this.currentLocation];
-        let fishType = this.weightedRandom(location.fishProbabilities);
-        
-        const bait = this.gameData.baits[this.currentBait];
-        if (bait.effect === 'target-fish') {
-            if (Math.random() < bait.value) {
-                fishType = bait.target;
-            }
-        }
-        
-        if (this.checkEvent('void-rift')) {
-            fishType = 'void';
-            this.addLog('🌀 虚空裂缝出现！鱼种强制变为虚空鳕', 'shiny');
-        }
-        
-        let size = this.getSizeByLevel();
-        
-        if (this.nextFishForceSmall) {
-            size = 'small';
-            this.nextFishForceSmall = false;
-        }
-        
-        if (fishType === 'void' && size === 'small') {
-            size = 'medium';
-        }
-        
-        const fish = this.gameData.fishTypes[fishType];
-        if (fish.isRare) {
-            size = 'small';
-        }
-        
-        let shinyProb = this.gameData.shinyBaseProb;
-        const rod = this.gameData.rods[this.currentRod];
-        if (rod.effect === 'shiny') {
-            shinyProb += rod.value;
-        }
-        if (bait.effect === 'shiny') {
-            shinyProb += bait.value;
-        }
-        shinyProb = Math.min(shinyProb, 0.06);
-        const isShiny = Math.random() < shinyProb;
-        
-        const fishData = {
-            type: fishType,
-            size: size,
-            shiny: isShiny,
-            timestamp: Date.now()
-        };
-        
-        let copyFish = null;
-        if (this.checkEvent('data-overflow')) {
-            copyFish = { ...fishData, shiny: false };
-            this.addLog('💥 数据溢出！获得两条相同的鱼', 'shiny');
-        }
-        
-        this.basket.push(fishData);
-        if (copyFish) {
-            this.basket.push(copyFish);
-        }
-        
-        const fishTypeName = fish.name;
-        const sizeName = this.gameData.fishSizes[size].name;
-        const shinyText = isShiny ? '✨炫彩' : '';
-        
-        const logType = fish.isRare || isShiny ? 'shiny' : 'fish';
-        this.addLog(`钓到一条${shinyText}${sizeName}${fishTypeName}，已放入鱼篓。`, logType);
-        
-        this.addExp(10);
-        
-        const key = `${fishType}-${size}`;
-        if (!this.collection[key]) {
-            this.collection[key] = { normal: false, shiny: false };
-        }
-        if (isShiny) {
-            this.collection[key].shiny = true;
-        } else {
-            this.collection[key].normal = true;
-        }
     }
 
     getSizeByLevel() {
@@ -834,9 +687,7 @@ class Game {
         let cumulative = 0;
         for (const [key, prob] of Object.entries(probabilities)) {
             cumulative += prob;
-            if (rand < cumulative) {
-                return key;
-            }
+            if (rand < cumulative) return key;
         }
         return Object.keys(probabilities)[0];
     }
@@ -844,9 +695,7 @@ class Game {
     calculatePrice(fish) {
         const fishType = this.gameData.fishTypes[fish.type];
         let price = fishType.prices[fish.size] || 0;
-        if (fish.shiny) {
-            price *= 5;
-        }
+        if (fish.shiny) price *= 5;
         return price;
     }
 
@@ -1049,9 +898,9 @@ class Game {
     }
 
     equipRod(rodId) {
-        const rod = this.gameData.rods[rodId];
         if (this.ownedRods.includes(rodId)) {
             this.currentRod = rodId;
+            const rod = this.gameData.rods[rodId];
             this.addLog(`装备了${rod.name}`, 'fish');
             this.updateUI();
             this.saveGame();
@@ -1134,9 +983,7 @@ class Game {
                 const total = Object.values(this.materials).reduce((a, b) => a + b, 0);
                 if (total < count) return false;
             } else {
-                if ((this.materials[matId] || 0) < count) {
-                    return false;
-                }
+                if ((this.materials[matId] || 0) < count) return false;
             }
         }
         return true;
