@@ -635,3 +635,55 @@ body {
         justify-content: center;
     }
 }
+
+.trap-status {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 10px 15px;
+    margin-top: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.trap-empty {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: #666;
+}
+
+.trap-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.trap-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.trap-timer {
+    color: #ff9800;
+    font-weight: bold;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    background: linear-gradient(135deg, #607d8b, #546e7a);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn-small:hover {
+    background: linear-gradient(135deg, #78909c, #607d8b);
+}

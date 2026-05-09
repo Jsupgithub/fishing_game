@@ -33,6 +33,9 @@ class Game {
         this.totalHookTime = 0;
         this.totalElapsedTime = 0;
         this.lastHookCheck = 0;
+        this.traps = [];
+        this.ownedTraps = [];
+        this.trapTimer = null;
         
         this.init();
     }
@@ -49,6 +52,7 @@ class Game {
             this.updateUI();
             this.setupEventListeners();
             this.checkDebugMode();
+            this.startTrapTimer();
         } catch (error) {
             console.error('Failed to initialize game:', error);
             document.getElementById('fishing-status').textContent = '加载失败，请刷新页面';
@@ -173,6 +177,8 @@ class Game {
                 this.eventEffects = data.eventEffects || this.eventEffects;
                 this.feedingHeat = data.feedingHeat || 0;
                 this.feedingCooldown = false;
+                this.traps = data.traps || [];
+                this.ownedTraps = data.ownedTraps || [];
             } catch (error) {
                 console.warn('Failed to load saved game data, using defaults:', error);
             }
@@ -231,7 +237,9 @@ class Game {
             materials: this.materials,
             collection: this.collection,
             eventEffects: this.eventEffects,
-            feedingHeat: this.feedingHeat > 0 && !this.feedingCooldown ? this.feedingHeat : 0
+            feedingHeat: this.feedingHeat > 0 && !this.feedingCooldown ? this.feedingHeat : 0,
+            traps: this.traps,
+            ownedTraps: this.ownedTraps
         };
         localStorage.setItem('fishing-game-data', JSON.stringify(data));
     }
@@ -711,6 +719,155 @@ class Game {
         return event && Math.random() < event.probability;
     }
 
+    startTrapTimer() {
+        if (this.trapTimer) {
+            clearInterval(this.trapTimer);
+        }
+        this.trapTimer = setInterval(() => {
+            this.checkTraps();
+            this.updateTrapsDisplay();
+        }, 1000);
+    }
+
+    checkTraps() {
+        const now = Date.now();
+        
+        this.traps.forEach((trap, index) => {
+            if (now >= trap.nextHook) {
+                this.harvestTrap(index);
+            }
+        });
+    }
+
+    harvestTrap(index) {
+        const trap = this.traps[index];
+        if (!trap) return;
+        
+        const isMaterial = Math.random() < 0.7;
+        
+        if (isMaterial) {
+            this.getMaterialForLocation(trap.location);
+        } else {
+            if (this.basket.length >= this.gameData.basketCapacity) {
+                this.addLog(`🪤 陷阱满了！鱼篓已满，无法存放`, 'error');
+            } else {
+                this.catchTrapFish(trap.location);
+            }
+        }
+        
+        if (this.baitCount > 0) {
+            this.baitCount--;
+        }
+        
+        this.setNextTrapHook(index);
+    }
+
+    catchTrapFish(location) {
+        const loc = this.gameData.locations[location];
+        const fishType = this.weightedRandom(loc.fishProbabilities);
+        const fish = this.gameData.fishTypes[fishType];
+        
+        const fishData = {
+            type: fishType,
+            size: 'small',
+            shiny: false,
+            timestamp: Date.now()
+        };
+        
+        this.basket.push(fishData);
+        
+        this.addLog(`🪤 陷阱捕获了小型${fish.name}！`, 'fish');
+        
+        this.addExp(5);
+        
+        const key = `${fishType}-small`;
+        if (!this.collection[key]) {
+            this.collection[key] = { normal: false, shiny: false };
+        }
+        this.collection[key].normal = true;
+    }
+
+    getMaterialForLocation(location) {
+        const loc = this.gameData.locations[location];
+        this.materials[loc.material] = (this.materials[loc.material] || 0) + 1;
+        this.addLog(`🪤 陷阱收集了${loc.materialIcon}${loc.materialName}×1`, 'material');
+    }
+
+    setNextTrapHook(index) {
+        const trap = this.traps[index];
+        if (!trap) return;
+        
+        const baseMinutes = 5 + Math.sqrt(Math.random()) * 40;
+        const baseMs = baseMinutes * 60 * 1000;
+        trap.nextHook = Date.now() + baseMs;
+    }
+
+    buyTrap() {
+        const trapConfig = this.gameData.traps['basic'];
+        if (this.gold < trapConfig.price) {
+            this.addLog(`💰 金币不足！需要${trapConfig.price}金币`, 'error');
+            return;
+        }
+        
+        const locationTraps = this.traps.filter(t => t.location === this.currentLocation);
+        if (locationTraps.length >= this.gameData.trapCapacity) {
+            this.addLog(`🪤 该水域陷阱已满（${this.gameData.trapCapacity}个）`, 'error');
+            return;
+        }
+        
+        this.gold -= trapConfig.price;
+        this.ownedTraps.push({ type: 'basic', location: this.currentLocation });
+        this.traps.push({
+            type: 'basic',
+            location: this.currentLocation,
+            nextHook: Date.now() + (5 * 60 * 1000)
+        });
+        
+        this.addLog(`🪤 购买了陷阱并放置在当前水域`, 'fish');
+        this.updateUI();
+        this.updateTrapsDisplay();
+        this.saveGame();
+    }
+
+    updateTrapsDisplay() {
+        const container = document.getElementById('trap-status');
+        if (!container) return;
+        
+        const currentTraps = this.traps.filter(t => t.location === this.currentLocation);
+        
+        if (currentTraps.length === 0) {
+            container.innerHTML = `
+                <div class="trap-empty">
+                    <span>🪤 陷阱: 无</span>
+                    <button class="btn btn-small" onclick="game.buyTrap();">购买陷阱 (100金币)</button>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '<div class="trap-list">';
+        currentTraps.forEach((trap, idx) => {
+            const now = Date.now();
+            const remaining = Math.max(0, trap.nextHook - now);
+            const seconds = Math.ceil(remaining / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            const timeStr = minutes > 0 ? `${minutes}分${secs}秒` : `${secs}秒`;
+            
+            html += `<div class="trap-item">
+                <span>🪤 陷阱${idx + 1}</span>
+                <span class="trap-timer">${timeStr}</span>
+            </div>`;
+        });
+        
+        if (currentTraps.length < this.gameData.trapCapacity) {
+            html += `<button class="btn btn-small" onclick="game.buyTrap();">+购买</button>`;
+        }
+        
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
     debugHook() {
         if (!this.isFishing) {
             this.isFishing = true;
@@ -949,6 +1106,7 @@ class Game {
         this.updateShopDisplay();
         this.updateCraftDisplay();
         this.updateCollectionDisplay();
+        this.updateTrapsDisplay();
     }
 
     updateBasketDisplay() {

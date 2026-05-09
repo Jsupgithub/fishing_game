@@ -1,4 +1,17 @@
 {
+    "traps": {
+        "basic": {
+            "name": "简易陷阱",
+            "price": 100,
+            "craftMaterial": "porcelain",
+            "craftCount": 3,
+            "description": "自动捕获材料和小型鱼"
+        }
+    },
+    "trapRecipes": {
+        "basic": { "trapId": "basic", "materials": { "porcelain": 3 }, "craftCount": 1 }
+    },
+    "trapCapacity": 4,
     "fishTypes": {
         "antefish": { "name": "前驱鱼", "icon": "🐟", "prices": { "small": 30, "medium": 50, "large": 120, "giant": 200 }, "product": "Antejuice Sac" },
         "chordfish": { "name": "弦鱼", "icon": "🐠", "prices": { "small": 40, "medium": 60, "large": 150, "giant": 250 }, "product": "Partial Organ" },
