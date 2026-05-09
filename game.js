@@ -40,6 +40,7 @@ class Game {
     async init() {
         try {
             await this.loadGameData();
+            this.populateLocationDropdown();
             this.migrateOldData();
             this.initMaterials();
             this.initCollection();
@@ -52,6 +53,17 @@ class Game {
             console.error('Failed to initialize game:', error);
             document.getElementById('fishing-status').textContent = '加载失败，请刷新页面';
         }
+    }
+
+    populateLocationDropdown() {
+        const select = document.getElementById('location-select');
+        select.innerHTML = '';
+        Object.entries(this.gameData.locations).forEach(([key, loc]) => {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = loc.name;
+            select.appendChild(option);
+        });
     }
     
     requestNotificationPermission() {
@@ -1175,7 +1187,27 @@ class Game {
     updateCollectionDisplay() {
         const container = document.getElementById('collection-content');
         
-        let html = '<div class="collection-grid">';
+        let capturedCount = 0;
+        let totalCount = 0;
+        Object.entries(this.gameData.fishTypes).forEach(([typeId, fishType]) => {
+            const sizes = fishType.isRare ? ['small'] : Object.keys(this.gameData.fishSizes);
+            sizes.forEach(sizeId => {
+                const key = `${typeId}-${sizeId}`;
+                const collectionData = this.collection[key];
+                if (collectionData && (collectionData.normal || collectionData.shiny)) {
+                    capturedCount++;
+                }
+                totalCount++;
+            });
+        });
+
+        if (capturedCount === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #888;">图鉴为空，钓到鱼后会自动解锁</p>';
+            return;
+        }
+        
+        let html = `<p style="text-align: center; color: #888; margin-bottom: 15px;">已解锁: ${capturedCount}/${totalCount}</p>`;
+        html += '<div class="collection-grid">';
         Object.entries(this.gameData.fishTypes).forEach(([typeId, fishType]) => {
             const sizes = fishType.isRare ? ['small'] : Object.keys(this.gameData.fishSizes);
             sizes.forEach(sizeId => {
@@ -1184,18 +1216,15 @@ class Game {
                 const hasNormal = collectionData && collectionData.normal;
                 const hasShiny = collectionData && collectionData.shiny;
                 
-                let statusClass = 'not-captured';
+                if (!hasNormal && !hasShiny) return;
+                
                 let shinyBadge = '';
-                if (hasNormal && hasShiny) {
-                    statusClass = 'captured';
+                if (hasShiny) {
                     shinyBadge = ' ✨';
-                } else if (hasNormal || hasShiny) {
-                    statusClass = 'captured';
-                    shinyBadge = hasShiny ? ' ✨' : '';
                 }
                 
                 html += `
-                    <div class="collection-item ${statusClass}">
+                    <div class="collection-item captured">
                         <div class="icon">${fishType.icon}${shinyBadge}</div>
                         <div class="name">${this.gameData.fishSizes[sizeId]?.name || ''}${fishType.name}</div>
                         <div class="shiny-status">
