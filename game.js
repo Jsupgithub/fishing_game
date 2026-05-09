@@ -58,6 +58,13 @@ class Game {
     populateLocationDropdown() {
         const select = document.getElementById('location-select');
         select.innerHTML = '';
+        
+        if (!this.gameData || !this.gameData.locations) {
+            console.error('gameData not loaded yet!');
+            select.innerHTML = '<option value="">加载中...</option>';
+            return;
+        }
+        
         Object.entries(this.gameData.locations).forEach(([key, loc]) => {
             const option = document.createElement('option');
             option.value = key;
