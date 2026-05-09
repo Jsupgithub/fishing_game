@@ -8,7 +8,7 @@ class Game {
         this.ownedRods = ['bamboo'];
         this.currentBait = 'basic';
         this.baitCount = 10;
-        this.currentLocation = 'silent-bay';
+        this.currentLocation = 'flathill';
         this.basket = [];
         this.materials = {};
         this.collection = {};
@@ -173,7 +173,7 @@ class Game {
     }
 
     validateMaterials(materials) {
-        const validMaterials = ['battery', 'heat-coil', 'void-dust'];
+        const validMaterials = ['porcelain', 'salt-rock', 'black-gunk', 'arcane-scrap', 'eel-fat', 'night-essence'];
         const result = {};
         Object.entries(materials).forEach(([key, value]) => {
             if (validMaterials.includes(key)) {
@@ -551,8 +551,8 @@ class Game {
         }
         
         if (this.checkEvent('void-rift')) {
-            fishType = 'void';
-            this.addLog('🌀 虚空裂缝出现！鱼种强制变为虚空鳕', 'shiny');
+            fishType = 'portalfish';
+            this.addLog('🌀 虚空裂缝出现！鱼种强制变为传送鱼', 'shiny');
         }
         
         let size = this.getSizeByLevel();
@@ -717,8 +717,8 @@ class Game {
         }
         
         if (this.checkEvent('void-rift')) {
-            fishType = 'void';
-            this.addLog('🌀 虚空裂缝出现！鱼种强制变为虚空鳕', 'shiny');
+            fishType = 'portalfish';
+            this.addLog('🌀 虚空裂缝出现！鱼种强制变为传送鱼', 'shiny');
         }
         
         let size = this.getSizeByLevel();
@@ -1247,7 +1247,7 @@ class Game {
         this.currentRod = 'bamboo';
         this.currentBait = 'basic';
         this.baitCount = 10;
-        this.currentLocation = 'silent-bay';
+        this.currentLocation = 'flathill';
         this.basket = [];
         this.materials = {};
         this.collection = {};
@@ -1314,7 +1314,7 @@ class Game {
             }
             this.currentBait = data.currentBait || 'basic';
             this.baitCount = data.baitCount || 10;
-            this.currentLocation = data.currentLocation || 'silent-bay';
+            this.currentLocation = data.currentLocation || 'flathill';
             this.basket = this.validateBasket(data.basket || []);
             this.materials = { ...this.materials, ...this.validateMaterials(data.materials || {}) };
             this.collection = { ...this.collection, ...this.validateCollection(data.collection || {}) };
